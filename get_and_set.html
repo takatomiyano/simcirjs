@@ -2,6 +2,7 @@
 <html>
   <head>
     <meta http-equiv="Content-Type" content="text/html;charset=UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
     <script
       src="https://code.jquery.com/jquery-3.2.1.min.js"
       integrity="sha256-hwg4gsxgFZhOsEEamdOYGBf13FyQuiTwlAQgxVSNgt4="
@@ -35,7 +36,8 @@ $(function() {
   });
 
   // load default (just specifies circuit size).
-  setCircuitData('{ "width":600, "height":200 }');
+  var defaultWidth = Math.min(600, window.innerWidth - 24);
+  setCircuitData('{ "width":' + defaultWidth + ', "height":200 }');
 });
     </script>
     <title></title>
@@ -46,6 +48,6 @@ $(function() {
       <button id="getDataBtn">v get data v</button>
       <button id="setDataBtn">^ set data ^</button>
     </div>
-    <textarea id="dataArea" style="width:600px; height:200px;"></textarea>
+    <textarea id="dataArea" style="width:100%; max-width:600px; height:200px; box-sizing:border-box;"></textarea>
   </body>
 </html>

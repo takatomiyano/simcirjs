@@ -1,0 +1,206 @@
+<!doctype html>
+<html lang="ja">
+<head>
+  <meta http-equiv="Content-Type" content="text/html;charset=UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <script type="text/javascript" src="simcir.js"></script>
+  <link rel="stylesheet" type="text/css" href="simcir.css" />
+  <script type="text/javascript" src="simcir-basicset.js"></script>
+  <link rel="stylesheet" type="text/css" href="simcir-basicset.css" />
+  <script type="text/javascript" src="simcir-ext.js"></script>
+  <style>
+    * { box-sizing: border-box; font-family: arial, sans-serif; }
+    body { margin: 0; padding: 0; background: #fff; }
+
+    nav {
+      display: flex;
+      align-items: center;
+      gap: 4px;
+      background: #2c3e50;
+      padding: 0 12px;
+      height: 40px;
+    }
+    nav a, nav span {
+      color: #aaa;
+      text-decoration: none;
+      padding: 4px 10px;
+      border-radius: 4px;
+      font-size: 0.9em;
+    }
+    nav a:hover { color: #fff; background: rgba(255,255,255,0.1); }
+    nav .active { color: #fff; background: rgba(255,255,255,0.15); font-weight: bold; }
+    nav .sep { color: #555; padding: 0; }
+
+    .container { padding: 8px 12px; }
+    h1 { font-size: 1.2em; margin: 4px 0 6px; }
+
+    .usage {
+      margin: 0 0 8px;
+      padding-left: 20px;
+      font-size: 0.8em;
+      color: #555;
+      line-height: 1.6;
+    }
+
+    #simcirMain { margin-bottom: 8px; }
+
+    .controls {
+      display: flex;
+      gap: 8px;
+      align-items: center;
+      flex-wrap: wrap;
+      margin-bottom: 4px;
+    }
+    .controls button {
+      padding: 8px 16px;
+      background: #2980b9;
+      color: #fff;
+      border: none;
+      border-radius: 4px;
+      font-size: 0.9em;
+      cursor: pointer;
+      touch-action: manipulation;
+    }
+    .controls button:active { background: #1a6fa0; }
+    .controls a {
+      display: inline-block;
+      padding: 8px 16px;
+      color: #555;
+      font-size: 0.9em;
+      text-decoration: none;
+      border: 1px solid #ccc;
+      border-radius: 4px;
+      touch-action: manipulation;
+    }
+    .controls a:active { background: #f0f0f0; }
+
+    .hint {
+      font-size: 0.75em;
+      color: #888;
+      margin-top: 4px;
+    }
+
+    /* Toast notification */
+    #toast {
+      position: fixed;
+      bottom: 24px;
+      left: 50%;
+      transform: translateX(-50%);
+      background: #333;
+      color: #fff;
+      padding: 10px 20px;
+      border-radius: 20px;
+      font-size: 0.9em;
+      pointer-events: none;
+      opacity: 0;
+      transition: opacity 0.3s;
+      z-index: 9999;
+    }
+    #toast.show { opacity: 1; }
+  </style>
+  <title>論理回路シミュレータ（学習モード）</title>
+</head>
+<body>
+
+<nav>
+  <span class="active">学習モード</span>
+  <span class="sep">|</span>
+  <a href="sample.html">詳細モード</a>
+</nav>
+
+<div class="container">
+  <h1>論理回路シミュレータ</h1>
+  <ul class="usage">
+    <li>左のツールボックスからデバイスをドラッグして配置</li>
+    <li>端子（ノード）をドラッグして接続。入力端子をクリックで接続を切断</li>
+    <li>デバイスをツールボックス側へ戻すと削除</li>
+    <li>ToggleスイッチやDCを接続して動作を確認しよう</li>
+  </ul>
+
+  <div id="simcirMain"></div>
+
+  <div class="controls">
+    <button id="copyBtn" onclick="urlCopy()">URLとしてコピー</button>
+    <a href="index.html">白紙に戻す</a>
+  </div>
+  <p class="hint">「URLとしてコピー」で現在の回路をURLに保存してシェアできます。</p>
+</div>
+
+<div id="toast"></div>
+
+<script>
+  var TOOLBOX = [
+    {"type":"DC"},
+    {"type":"Toggle"},
+    {"type":"LED","color":"#ff0000","label":"LED"},
+    {"type":"AND",  "label":"AND"},
+    {"type":"OR",   "label":"OR"},
+    {"type":"NOT",  "label":"NOT"},
+    {"type":"NAND", "label":"NAND"},
+    {"type":"XOR",  "label":"XOR"},
+    {"type":"4bit7seg","color":"#ff0000"}
+  ];
+
+  var BASE_CONFIG = {
+    width: 640, height: 420,
+    showToolbox: true,
+    toolbox: TOOLBOX,
+    devices: [], connectors: []
+  };
+
+  // ---- Toast ----
+  var toastTimer = null;
+  function showToast(msg) {
+    var el = document.getElementById('toast');
+    el.textContent = msg;
+    el.className = 'show';
+    if (toastTimer) { clearTimeout(toastTimer); }
+    toastTimer = setTimeout(function() {
+      el.className = '';
+    }, 2000);
+  }
+
+  // ---- URL copy ----
+  function urlCopy() {
+    var $ = simcir.$;
+    var hash = simcirExt.getData($('.simcir-workspace'));
+    history.replaceState(null, '', location.pathname + '#' + hash);
+    if (navigator.clipboard && navigator.clipboard.writeText) {
+      navigator.clipboard.writeText(location.href)
+        .then(function() { showToast('URLをクリップボードにコピーしました'); })
+        .catch(function() { legacyCopy(); });
+    } else {
+      legacyCopy();
+    }
+  }
+
+  function legacyCopy() {
+    var input = document.createElement('input');
+    input.style.position = 'fixed';
+    input.style.opacity = '0';
+    input.value = location.href;
+    document.body.appendChild(input);
+    input.select();
+    try {
+      document.execCommand('copy');
+      showToast('URLをクリップボードにコピーしました');
+    } catch (e) {
+      prompt('このURLをコピーしてください:', location.href);
+    }
+    document.body.removeChild(input);
+  }
+
+  // ---- Init ----
+  window.addEventListener('DOMContentLoaded', function() {
+    var $ = simcir.$;
+    var hash = location.hash.replace('#', '');
+    if (hash) {
+      simcirExt.setData($('#simcirMain'), BASE_CONFIG, hash);
+    } else {
+      simcir.setupSimcir($('#simcirMain'), BASE_CONFIG);
+    }
+  });
+</script>
+
+</body>
+</html>

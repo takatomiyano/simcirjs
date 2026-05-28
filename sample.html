@@ -2,6 +2,7 @@
 <html>
 <head>
 <meta http-equiv="Content-Type" content="text/html;charset=UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0" />
 <script type="text/javascript" src="simcir.js"></script>
 <link rel="stylesheet" type="text/css" href="simcir.css" />
 <script type="text/javascript" src="simcir-basicset.js"></script>
@@ -10,6 +11,14 @@
 <style type="text/css">
 * {
   font-family: arial, sans-serif;
+  box-sizing: border-box;
+}
+
+body {
+  margin: 0;
+  padding: 8px 12px;
+  max-width: 100%;
+  overflow-x: hidden;
 }
 
 .code {
@@ -20,15 +29,48 @@
   border-style: solid;
   background-color: #f0f0f0;
   white-space: pre;
+  overflow-x: auto;
+  max-width: 100%;
 }
 
 .note {
   color: #0000ff;
 }
+
+svg {
+  max-width: 100%;
+  height: auto;
+}
+
+nav {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  background: #2c3e50;
+  padding: 0 12px;
+  height: 40px;
+  margin: -8px -12px 12px;
+}
+nav a, nav span {
+  color: #aaa;
+  text-decoration: none;
+  padding: 4px 10px;
+  border-radius: 4px;
+  font-size: 0.9em;
+}
+nav a:hover { color: #fff; background: rgba(255,255,255,0.1); }
+nav .active { color: #fff; background: rgba(255,255,255,0.15); font-weight: bold; }
+nav .sep { color: #555; padding: 0; }
 </style>
 <title>SimcirJS</title>
 </head>
 <body>
+
+<nav>
+  <a href="index.html">学習モード</a>
+  <span class="sep">|</span>
+  <span class="active">詳細モード</span>
+</nav>
 
 <h1>SimcirJS</h1>
 

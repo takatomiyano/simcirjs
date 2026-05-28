@@ -755,6 +755,24 @@ simcir.$ = function() {
     return {x: x, y: y};
   };
 
+  var pageToSVG = function($svg, pageX, pageY) {
+    var pt = $svg[0].createSVGPoint();
+    pt.x = pageX - window.pageXOffset;
+    pt.y = pageY - window.pageYOffset;
+    return pt.matrixTransform($svg[0].getScreenCTM().inverse());
+  };
+
+  var getEventCoords = function(event) {
+    var oe = event.originalEvent || event;
+    if (oe.touches && oe.touches.length > 0) {
+      return {pageX: oe.touches[0].pageX, pageY: oe.touches[0].pageY};
+    }
+    if (oe.changedTouches && oe.changedTouches.length > 0) {
+      return {pageX: oe.changedTouches[0].pageX, pageY: oe.changedTouches[0].pageY};
+    }
+    return {pageX: event.pageX, pageY: event.pageY};
+  };
+
   var enableEvents = function($o, enable) {
     $o.css('pointer-events', enable? 'visiblePainted' : 'none');
   };
@@ -1296,23 +1314,23 @@ simcir.$ = function() {
       event.preventDefault();
       dialogManager.toFront($dlg);
       var off = $dlg.offset();
+      var c = getEventCoords(event);
       dragPoint = {
-        x: event.pageX - off.left,
-        y: event.pageY - off.top};
-      $(document).on('mousemove', dlg_mouseMoveHandler);
-      $(document).on('mouseup', dlg_mouseUpHandler);
+        x: c.pageX - off.left,
+        y: c.pageY - off.top};
+      $(document).on('mousemove touchmove', dlg_mouseMoveHandler);
+      $(document).on('mouseup touchend', dlg_mouseUpHandler);
     };
     var dlg_mouseMoveHandler = function(event) {
-      moveTo(
-          event.pageX - dragPoint.x,
-          event.pageY - dragPoint.y);
+      var c = getEventCoords(event);
+      moveTo(c.pageX - dragPoint.x, c.pageY - dragPoint.y);
     };
     var dlg_mouseUpHandler = function(event) {
-      $(document).off('mousemove', dlg_mouseMoveHandler);
-      $(document).off('mouseup', dlg_mouseUpHandler);
+      $(document).off('mousemove touchmove', dlg_mouseMoveHandler);
+      $(document).off('mouseup touchend', dlg_mouseUpHandler);
     };
-    $dlg.on('mousedown', dlg_mouseDownHandler);
-    $closeButton.on('mousedown', function() {
+    $dlg.on('mousedown touchstart', dlg_mouseDownHandler);
+    $closeButton.on('mousedown touchstart', function() {
       $dlg.trigger('close');
       $dlg.remove();
       dialogManager.remove($dlg);
@@ -1588,29 +1606,35 @@ simcir.$ = function() {
     var bar_mouseDownHandler = function(event) {
       event.preventDefault();
       event.stopPropagation();
-      var pos = transform($bar);
-      dragPoint = {
-          x: event.pageX - pos.x,
-          y: event.pageY - pos.y};
-      $(document).on('mousemove', bar_mouseMoveHandler);
-      $(document).on('mouseup', bar_mouseUpHandler);
+      var $svg = $bar.closest('svg');
+      var c0 = getEventCoords(event);
+      var svgY0 = pageToSVG($svg, c0.pageX, c0.pageY).y;
+      var barPos = transform($bar);
+      dragPoint = {y: svgY0 - barPos.y};
+      $(document).on('mousemove touchmove', bar_mouseMoveHandler);
+      $(document).on('mouseup touchend', bar_mouseUpHandler);
     };
     var bar_mouseMoveHandler = function(event) {
       calc(function(unitSize) {
-        setValue( (event.pageY - dragPoint.y) / unitSize);
+        var $svg = $bar.closest('svg');
+        var c = getEventCoords(event);
+        var svgY = pageToSVG($svg, c.pageX, c.pageY).y;
+        setValue( (svgY - dragPoint.y) / unitSize);
       });
     };
     var bar_mouseUpHandler = function(event) {
-      $(document).off('mousemove', bar_mouseMoveHandler);
-      $(document).off('mouseup', bar_mouseUpHandler);
+      $(document).off('mousemove touchmove', bar_mouseMoveHandler);
+      $(document).off('mouseup touchend', bar_mouseUpHandler);
     };
-    $bar.on('mousedown', bar_mouseDownHandler);
+    $bar.on('mousedown touchstart', bar_mouseDownHandler);
     var body_mouseDownHandler = function(event) {
       event.preventDefault();
       event.stopPropagation();
-      var off = $scrollbar.parent('svg').offset();
-      var pos = transform($scrollbar);
-      var y = event.pageY - off.top - pos.y;
+      var $svg = $body.closest('svg');
+      var c = getEventCoords(event);
+      var svgPos = pageToSVG($svg, c.pageX, c.pageY);
+      var scrollbarSVGPos = offset($scrollbar);
+      var y = svgPos.y - scrollbarSVGPos.y;
       var barPos = transform($bar);
       if (y < barPos.y) {
         $scrollbar.trigger('rollup');
@@ -1618,7 +1642,7 @@ simcir.$ = function() {
         $scrollbar.trigger('rolldown');
       }
     };
-    $body.on('mousedown', body_mouseDownHandler);
+    $body.on('mousedown touchstart', body_mouseDownHandler);
 
     var setSize = function(width, height) {
       _width = width;
@@ -1946,16 +1970,15 @@ simcir.$ = function() {
 
     var beginConnect = function(event, $target) {
       var $srcNode = $target.closest('.simcir-node');
-      var off = $workspace.offset();
       var pos = offset($srcNode);
       if ($srcNode.attr('simcir-node-type') == 'in') {
         disconnect($srcNode);
       }
       dragMoveHandler = function(event) {
-        var x = event.pageX - off.left;
-        var y = event.pageY - off.top;
+        var c = getEventCoords(event);
+        var svgPos = pageToSVG($workspace, c.pageX, c.pageY);
         $temporaryPane.children().remove();
-        $temporaryPane.append(createConnector(pos.x, pos.y, x, y) );
+        $temporaryPane.append(createConnector(pos.x, pos.y, svgPos.x, svgPos.y) );
       };
       dragCompleteHandler = function(event) {
         $temporaryPane.children().remove();
@@ -1974,13 +1997,17 @@ simcir.$ = function() {
       $dev = createDevice(controller($dev).deviceDef, false, scope);
       transform($dev, pos.x, pos.y);
       $temporaryPane.append($dev);
+      var c0 = getEventCoords(event);
+      var svgStart = pageToSVG($workspace, c0.pageX, c0.pageY);
       var dragPoint = {
-        x: event.pageX - pos.x,
-        y: event.pageY - pos.y};
+        x: svgStart.x - pos.x,
+        y: svgStart.y - pos.y};
       dragMoveHandler = function(event) {
+        var c = getEventCoords(event);
+        var svgPos = pageToSVG($workspace, c.pageX, c.pageY);
         transform($dev,
-            event.pageX - dragPoint.x,
-            event.pageY - dragPoint.y);
+            svgPos.x - dragPoint.x,
+            svgPos.y - dragPoint.y);
       };
       dragCompleteHandler = function(event) {
         var $target = $(event.target);
@@ -2018,16 +2045,20 @@ simcir.$ = function() {
         $dev.parent().append($dev.detach() );
       }
 
+      var c0 = getEventCoords(event);
+      var svgStart = pageToSVG($workspace, c0.pageX, c0.pageY);
       var dragPoint = {
-        x: event.pageX - pos.x,
-        y: event.pageY - pos.y};
+        x: svgStart.x - pos.x,
+        y: svgStart.y - pos.y};
       dragMoveHandler = function(event) {
         // disable events while dragging.
         enableEvents($dev, false);
         var curPos = transform($dev);
+        var c = getEventCoords(event);
+        var svgPos = pageToSVG($workspace, c.pageX, c.pageY);
         var deltaPos = {
-          x: event.pageX - dragPoint.x - curPos.x,
-          y: event.pageY - dragPoint.y - curPos.y};
+          x: svgPos.x - dragPoint.x - curPos.x,
+          y: svgPos.y - dragPoint.y - curPos.y};
         $.each($selectedDevices, function(i, $dev) {
           var curPos = transform($dev);
           transform($dev,
@@ -2066,12 +2097,15 @@ simcir.$ = function() {
           height: Math.abs(p1.y - p2.y)};
       };
       deselectAll();
-      var off = $workspace.offset();
       var pos = offset($devicePane);
-      var p1 = {x: event.pageX - off.left, y: event.pageY - off.top};
+      var c0 = getEventCoords(event);
+      var svgStart = pageToSVG($workspace, c0.pageX, c0.pageY);
+      var p1 = {x: svgStart.x, y: svgStart.y};
       dragMoveHandler = function(event) {
         deselectAll();
-        var p2 = {x: event.pageX - off.left, y: event.pageY - off.top};
+        var c = getEventCoords(event);
+        var svgPos = pageToSVG($workspace, c.pageX, c.pageY);
+        var p2 = {x: svgPos.x, y: svgPos.y};
         var selRect = pointToRect(p1, p2);
         $devicePane.children('.simcir-device').each(function() {
           var $dev = $(this);
@@ -2111,8 +2145,8 @@ simcir.$ = function() {
       } else {
         beginSelectDevice(event, $target);
       }
-      $(document).on('mousemove', mouseMoveHandler);
-      $(document).on('mouseup', mouseUpHandler);
+      $(document).on('mousemove touchmove', mouseMoveHandler);
+      $(document).on('mouseup touchend', mouseUpHandler);
     };
     var mouseMoveHandler = function(event) {
       if (dragMoveHandler != null) {
@@ -2121,7 +2155,14 @@ simcir.$ = function() {
     };
     var mouseUpHandler = function(event) {
       if (dragCompleteHandler != null) {
-        dragCompleteHandler(event);
+        var oe = event.originalEvent || event;
+        if (oe.changedTouches && oe.changedTouches.length > 0) {
+          var t = oe.changedTouches[0];
+          var el = document.elementFromPoint(t.clientX, t.clientY);
+          dragCompleteHandler({target: el || event.target});
+        } else {
+          dragCompleteHandler(event);
+        }
       }
       dragMoveHandler = null;
       dragCompleteHandler = null;
@@ -2129,10 +2170,10 @@ simcir.$ = function() {
         enableEvents($(this), true);
       });
       $temporaryPane.children().remove();
-      $(document).off('mousemove', mouseMoveHandler);
-      $(document).off('mouseup', mouseUpHandler);
+      $(document).off('mousemove touchmove', mouseMoveHandler);
+      $(document).off('mouseup touchend', mouseUpHandler);
     };
-    $workspace.on('mousedown', mouseDownHandler);
+    $workspace.on('mousedown touchstart', mouseDownHandler);
 
     //-------------------------------------------
     //
@@ -2166,8 +2207,10 @@ simcir.$ = function() {
     var $dataArea = $('<textarea></textarea>').
       addClass('simcir-json-data-area').
       attr('readonly', 'readonly').
-      css('width', $workspace.attr('width') + 'px').
-      css('height', $workspace.attr('height') + 'px');
+      css('width', '100%').
+      css('max-width', $workspace.attr('width') + 'px').
+      css('height', $workspace.attr('height') + 'px').
+      css('box-sizing', 'border-box');
     var showData = false;
     var toggle = function() {
       $workspace.css('display', !showData? 'inline' : 'none');
@@ -2291,7 +2334,9 @@ simcir.$ = function() {
     enableEvents: enableEvents,
     graphics: graphics,
     controller: controller,
-    unit: unit
+    unit: unit,
+    pageToSVG: pageToSVG,
+    getEventCoords: getEventCoords
   });
 }(simcir);
 

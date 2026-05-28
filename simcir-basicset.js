@@ -600,35 +600,33 @@
           update();
         };
   
-        var dragPoint = null;
         var knob_mouseDownHandler = function(event) {
           event.preventDefault();
           event.stopPropagation();
-          dragPoint = {x: event.pageX, y: event.pageY};
-          $(document).on('mousemove', knob_mouseMoveHandler);
-          $(document).on('mouseup', knob_mouseUpHandler);
+          $(document).on('mousemove touchmove', knob_mouseMoveHandler);
+          $(document).on('mouseup touchend', knob_mouseUpHandler);
         };
         var knob_mouseMoveHandler = function(event) {
-          var off = $knob.parent('svg').offset();
-          var pos = $s.offset($knob);
-          var cx = off.left + pos.x;
-          var cy = off.top + pos.y;
-          var dx = event.pageX - cx;
-          var dy = event.pageY - cy;
+          var $svg = $knob.closest('svg');
+          var c = $s.getEventCoords(event);
+          var svgPos = $s.pageToSVG($svg, c.pageX, c.pageY);
+          var knobPos = $s.offset($knob);
+          var dx = svgPos.x - knobPos.x;
+          var dy = svgPos.y - knobPos.y;
           if (dx == 0 && dy == 0) return;
           setAngle(thetaToAngle(Math.atan2(dy, dx) ) );
         };
         var knob_mouseUpHandler = function(event) {
-          $(document).off('mousemove', knob_mouseMoveHandler);
-          $(document).off('mouseup', knob_mouseUpHandler);
+          $(document).off('mousemove touchmove', knob_mouseMoveHandler);
+          $(document).off('mouseup touchend', knob_mouseUpHandler);
         };
         device.$ui.on('deviceAdd', function() {
           $s.enableEvents($knob, true);
-          $knob.on('mousedown', knob_mouseDownHandler);
+          $knob.on('mousedown touchstart', knob_mouseDownHandler);
         });
         device.$ui.on('deviceRemove', function() {
           $s.enableEvents($knob, false);
-          $knob.off('mousedown', knob_mouseDownHandler);
+          $knob.off('mousedown touchstart', knob_mouseDownHandler);
         });
   
         var update = function() {

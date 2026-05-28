@@ -11,6 +11,7 @@
 
 .simcir-body {
   display: inline-block;
+  max-width: 100%;
 }
 
 .simcir-workspace {
@@ -19,6 +20,11 @@
   border-width: 1px;
   border-style: solid;
   border-color: #666666;
+  max-width: 100%;
+  height: auto;
+  touch-action: none;
+  -webkit-user-select: none;
+  user-select: none;
 }
 
 .simcir-pin-hole {
@@ -215,4 +221,22 @@ TABLE.simcir-doc-params-table TD {
      -moz-border-radius: 4px;
           border-radius: 4px;
   background-color: #f0f0f0;
+}
+
+@media (max-width: 600px) {
+  .simcir-body {
+    display: block;
+    width: 100%;
+  }
+  .simcir-workspace {
+    width: 100% !important;
+    height: auto !important;
+  }
+  .simcir-label-editor {
+    width: 80px;
+  }
+  .simcir-dialog {
+    max-width: calc(100vw - 16px);
+    box-sizing: border-box;
+  }
 }
