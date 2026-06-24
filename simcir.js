@@ -1693,6 +1693,124 @@ simcir.$ = function() {
     return $scrollbar;
   };
 
+  var createHScrollbar = function() {
+
+    // horizontal only.
+    var _value = 0;
+    var _min = 0;
+    var _max = 0;
+    var _barSize = 0;
+    var _width = 0;
+    var _height = 0;
+
+    var $body = createSVGElement('rect');
+    var $bar = createSVGElement('g').
+      append(createSVGElement('rect') ).
+      attr('class', 'simcir-scrollbar-bar');
+    var $scrollbar = createSVGElement('g').
+      attr('class', 'simcir-scrollbar').
+      append($body).append($bar).
+      on('unitup', function(event) {
+        setValue(_value - unit * 2);
+      }).on('unitdown', function(event) {
+        setValue(_value + unit * 2);
+      }).on('rollup', function(event) {
+        setValue(_value - _barSize);
+      }).on('rolldown', function(event) {
+        setValue(_value + _barSize);
+      });
+
+    var dragPoint = null;
+    var bar_mouseDownHandler = function(event) {
+      event.preventDefault();
+      event.stopPropagation();
+      var $svg = $bar.closest('svg');
+      var c0 = getEventCoords(event);
+      var svgX0 = pageToSVG($svg, c0.pageX, c0.pageY).x;
+      var barPos = transform($bar);
+      dragPoint = {x: svgX0 - barPos.x};
+      $(document).on('mousemove touchmove', bar_mouseMoveHandler);
+      $(document).on('mouseup touchend', bar_mouseUpHandler);
+    };
+    var bar_mouseMoveHandler = function(event) {
+      calc(function(unitSize) {
+        var $svg = $bar.closest('svg');
+        var c = getEventCoords(event);
+        var svgX = pageToSVG($svg, c.pageX, c.pageY).x;
+        setValue( (svgX - dragPoint.x) / unitSize);
+      });
+    };
+    var bar_mouseUpHandler = function(event) {
+      $(document).off('mousemove touchmove', bar_mouseMoveHandler);
+      $(document).off('mouseup touchend', bar_mouseUpHandler);
+    };
+    $bar.on('mousedown touchstart', bar_mouseDownHandler);
+    var body_mouseDownHandler = function(event) {
+      event.preventDefault();
+      event.stopPropagation();
+      var $svg = $body.closest('svg');
+      var c = getEventCoords(event);
+      var svgPos = pageToSVG($svg, c.pageX, c.pageY);
+      var scrollbarSVGPos = offset($scrollbar);
+      var x = svgPos.x - scrollbarSVGPos.x;
+      var barPos = transform($bar);
+      if (x < barPos.x) {
+        $scrollbar.trigger('rollup');
+      } else {
+        $scrollbar.trigger('rolldown');
+      }
+    };
+    $body.on('mousedown touchstart', body_mouseDownHandler);
+
+    var setSize = function(width, height) {
+      _width = width;
+      _height = height;
+      layout();
+    };
+    var layout = function() {
+
+      $body.attr({x: 0, y: 0, width: _width, height: _height});
+
+      var visible = _max - _min > _barSize;
+      $bar.css('display', visible? 'inline' : 'none');
+      if (!visible) {
+        return;
+      }
+      calc(function(unitSize) {
+        $bar.children('rect').
+          attr({x: 0, y: 0, width: _barSize * unitSize, height: _height});
+        transform($bar, _value * unitSize, 0);
+      });
+    };
+    var calc = function(f) {
+      f(_width / (_max - _min) );
+    };
+    var setValue = function(value) {
+      setValues(value, _min, _max, _barSize);
+    };
+    var setValues = function(value, min, max, barSize) {
+      value = Math.max(min, Math.min(value, max - barSize) );
+      var changed = (value != _value);
+      _value = value;
+      _min = min;
+      _max = max;
+      _barSize = barSize;
+      layout();
+      if (changed) {
+        $scrollbar.trigger('scrollValueChange');
+      }
+    };
+    var getValue = function() {
+      return _value;
+    };
+    controller($scrollbar, {
+      setSize: setSize,
+      setValues: setValues,
+      getValue: getValue
+    });
+    return $scrollbar;
+  };
+
   var getUniqueId = function() {
     var uniqueIdCount = 0;
     return function() {
@@ -1717,7 +1835,9 @@ simcir.$ = function() {
     var workspaceWidth = data.width;
     var workspaceHeight = data.height;
     var barWidth = unit;
-    var toolboxWidth = data.showToolbox? unit * 6 + barWidth : 0;
+    var isMobilePortrait = window.innerWidth < window.innerHeight;
+    var toolboxWidth = (data.showToolbox && !isMobilePortrait) ? unit * 6 + barWidth : 0;
+    var toolboxHeight = (data.showToolbox && isMobilePortrait) ? Math.round((unit * 4 + fontSize) * 1.3) : 0;
 
     var connectorsValid = true;
     var connectorsValidator = function() {
@@ -1751,7 +1871,7 @@ simcir.$ = function() {
       var patId = getUniqueId();
       var pitch = unit / 2;
       var w = workspaceWidth - toolboxWidth;
-      var h = workspaceHeight;
+      var h = workspaceHeight - toolboxHeight;
 
       $defs.append(createSVGElement('pattern').
           attr({id: patId, x: 0, y: 0,
@@ -1765,29 +1885,42 @@ simcir.$ = function() {
     }();
 
     var $toolboxDevicePane = createSVGElement('g');
-    var $scrollbar = createScrollbar();
+    var $scrollbar = toolboxHeight > 0 ? createHScrollbar() : createScrollbar();
     $scrollbar.on('scrollValueChange', function(event) {
-      transform($toolboxDevicePane, 0,
-          -controller($scrollbar).getValue() );
+      if (toolboxHeight > 0) {
+        transform($toolboxDevicePane, -controller($scrollbar).getValue(), 0);
+      } else {
+        transform($toolboxDevicePane, 0, -controller($scrollbar).getValue());
+      }
     });
-    controller($scrollbar).setSize(barWidth, workspaceHeight);
-    transform($scrollbar, toolboxWidth - barWidth, 0);
+    if (toolboxHeight > 0) {
+      controller($scrollbar).setSize(workspaceWidth, barWidth);
+      transform($scrollbar, 0, toolboxHeight - barWidth);
+    } else {
+      controller($scrollbar).setSize(barWidth, workspaceHeight);
+      transform($scrollbar, toolboxWidth - barWidth, 0);
+    }
     var $toolboxPane = createSVGElement('g').
       attr('class', 'simcir-toolbox').
       append(createSVGElement('rect').
         attr({x: 0, y: 0,
-          width: toolboxWidth,
-          height: workspaceHeight}) ).
+          width: toolboxHeight > 0 ? workspaceWidth : toolboxWidth,
+          height: toolboxHeight > 0 ? toolboxHeight : workspaceHeight}) ).
       append($toolboxDevicePane).
       append($scrollbar).on('wheel', function(event) {
         event.preventDefault();
         var oe = event.originalEvent || event;
-        if (oe.deltaY < 0) {
-          $scrollbar.trigger('unitup');
-        } else if (oe.deltaY > 0) {
-          $scrollbar.trigger('unitdown');
+        if (toolboxHeight > 0) {
+          if (oe.deltaX < 0 || oe.deltaY < 0) { $scrollbar.trigger('unitup'); }
+          else if (oe.deltaX > 0 || oe.deltaY > 0) { $scrollbar.trigger('unitdown'); }
+        } else {
+          if (oe.deltaY < 0) { $scrollbar.trigger('unitup'); }
+          else if (oe.deltaY > 0) { $scrollbar.trigger('unitdown'); }
         }
       });
+    if (toolboxHeight > 0) {
+      transform($toolboxPane, 0, workspaceHeight - toolboxHeight);
+    }
 
     var $devicePane = createSVGElement('g');
     transform($devicePane, toolboxWidth, 0);
@@ -1844,16 +1977,31 @@ simcir.$ = function() {
     };
 
     var loadToolbox = function(data) {
-      var vgap = 8;
-      var y = vgap;
-      $.each(data.toolbox, function(i, deviceDef) {
-        var $dev = createDevice(deviceDef);
-        $toolboxDevicePane.append($dev);
-        var size = controller($dev).getSize();
-        transform($dev, (toolboxWidth - barWidth - size.width) / 2, y);
-        y += (size.height + fontSize + vgap);
-      });
-      controller($scrollbar).setValues(0, 0, y, workspaceHeight);
+      if (toolboxHeight > 0) {
+        var hgap = 8;
+        var x = hgap;
+        var contentHeight = toolboxHeight - barWidth;
+        $.each(data.toolbox, function(i, deviceDef) {
+          var $dev = createDevice(deviceDef);
+          $toolboxDevicePane.append($dev);
+          var size = controller($dev).getSize();
+          var centerY = Math.max(0, (contentHeight - size.height - fontSize) / 2);
+          transform($dev, x, centerY);
+          x += (size.width + hgap);
+        });
+        controller($scrollbar).setValues(0, 0, x, workspaceWidth);
+      } else {
+        var vgap = 8;
+        var y = vgap;
+        $.each(data.toolbox, function(i, deviceDef) {
+          var $dev = createDevice(deviceDef);
+          $toolboxDevicePane.append($dev);
+          var size = controller($dev).getSize();
+          transform($dev, (toolboxWidth - barWidth - size.width) / 2, y);
+          y += (size.height + fontSize + vgap);
+        });
+        controller($scrollbar).setValues(0, 0, y, workspaceHeight);
+      }
     };
 
     var getData = function() {
@@ -1964,7 +2112,7 @@ simcir.$ = function() {
       var x = Math.max(0, Math.min(pos.x,
           workspaceWidth - toolboxWidth - size.width) );
       var y = Math.max(0, Math.min(pos.y,
-          workspaceHeight - size.height) );
+          workspaceHeight - toolboxHeight - size.height) );
       transform($dev, adjust(x), adjust(y) );
     };
 
