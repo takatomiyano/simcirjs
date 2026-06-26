@@ -10,6 +10,22 @@ Copyright (c) 2026 Takatomi Yano
 Licensed under the MIT license:
   http://www.opensource.org/licenses/mit-license.php
 
+-- Third-party libraries
+
+qrcode.js (qrcode-generator)
+  Copyright (c) 2009 Kazuhiko Arase
+  URL: https://github.com/kazuhikoarase/qrcode-generator
+  Licensed under the MIT license:
+    http://www.opensource.org/licenses/mit-license.php
+
+lz-string.min.js (lz-string v1.5.0)
+  Copyright (c) 2013 pieroxy
+  URL: https://github.com/pieroxy/lz-string
+  Licensed under the MIT license:
+    http://www.opensource.org/licenses/mit-license.php
+  Used to compress circuit data before embedding it in the URL hash,
+  significantly reducing QR code size.
+
 
 ====Original README.txt from here====
 

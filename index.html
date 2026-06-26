@@ -7,7 +7,9 @@
   <link rel="stylesheet" type="text/css" href="simcir.css" />
   <script type="text/javascript" src="simcir-basicset.js"></script>
   <link rel="stylesheet" type="text/css" href="simcir-basicset.css" />
+  <script type="text/javascript" src="lz-string.min.js"></script>
   <script type="text/javascript" src="simcir-ext.js"></script>
+  <script type="text/javascript" src="qrcode.js"></script>
   <style>
     * { box-sizing: border-box; font-family: arial, sans-serif; }
     body { margin: 0; padding: 0; background: #fff; }
@@ -80,6 +82,42 @@
       margin-top: 4px;
     }
 
+    /* QR modal */
+    #qrOverlay {
+      display: none;
+      position: fixed;
+      inset: 0;
+      background: rgba(0,0,0,0.5);
+      z-index: 10000;
+      align-items: center;
+      justify-content: center;
+    }
+    #qrOverlay.show { display: flex; }
+    #qrBox {
+      background: #fff;
+      border-radius: 8px;
+      padding: 20px;
+      text-align: center;
+      max-width: 90vw;
+    }
+    #qrBox p {
+      margin: 12px 0 0;
+      font-size: 0.75em;
+      color: #555;
+      word-break: break-all;
+      max-width: 260px;
+    }
+    #qrBox button {
+      margin-top: 12px;
+      padding: 6px 18px;
+      background: #888;
+      color: #fff;
+      border: none;
+      border-radius: 4px;
+      cursor: pointer;
+      font-size: 0.85em;
+    }
+
     /* Toast notification */
     #toast {
       position: fixed;
@@ -121,9 +159,18 @@
 
   <div class="controls">
     <button id="copyBtn" onclick="urlCopy()">URLとしてコピー</button>
+    <button onclick="showQR()">QRコードを表示</button>
     <a href="index.html">白紙に戻す</a>
   </div>
   <p class="hint">「URLとしてコピー」で現在の回路をURLに保存してシェアできます。</p>
+</div>
+
+<div id="qrOverlay" onclick="hideQR(event)">
+  <div id="qrBox">
+    <div id="qrImage"></div>
+    <p id="qrUrl"></p>
+    <button onclick="hideQR()">閉じる</button>
+  </div>
 </div>
 
 <div id="toast"></div>
@@ -158,6 +205,30 @@
     toastTimer = setTimeout(function() {
       el.className = '';
     }, 2000);
+  }
+
+  // ---- QR code ----
+  function showQR() {
+    var $ = simcir.$;
+    // QR専用高圧縮フォーマット(q:プレフィックス)を使用。
+    // URLバーは変更せず、QRコード用URLのみ生成する。
+    var qrHash = simcirExt.getQRData($('.simcir-workspace'));
+    var qrUrl = location.href.split('#')[0] + '#' + qrHash;
+    try {
+      var qr = qrcode(0, 'M');
+      qr.addData(qrUrl);
+      qr.make();
+      document.getElementById('qrImage').innerHTML = qr.createSvgTag(4, 0);
+      document.getElementById('qrUrl').textContent = qrUrl;
+      document.getElementById('qrOverlay').className = 'show';
+    } catch (e) {
+      showToast('URLが長すぎてQRコードを生成できません');
+    }
+  }
+
+  function hideQR(e) {
+    if (e && e.target !== document.getElementById('qrOverlay')) { return; }
+    document.getElementById('qrOverlay').className = '';
   }
 
   // ---- URL copy ----
