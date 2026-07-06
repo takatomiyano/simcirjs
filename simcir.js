@@ -1832,11 +1832,11 @@ simcir.$ = function() {
 
     var scope = {};
 
-    var workspaceWidth = data.width;
+    var isMobilePortrait = window.innerWidth < window.innerHeight;
+    var workspaceWidth  = data.width;
     var workspaceHeight = data.height;
     var barWidth = unit;
-    var isMobilePortrait = window.innerWidth < window.innerHeight;
-    var toolboxWidth = (data.showToolbox && !isMobilePortrait) ? unit * 6 + barWidth : 0;
+    var toolboxWidth  = (data.showToolbox && !isMobilePortrait) ? unit * 6 + barWidth : 0;
     var toolboxHeight = (data.showToolbox && isMobilePortrait) ? Math.round((unit * 4 + fontSize) * 1.3) : 0;
 
     var connectorsValid = true;
