@@ -103,7 +103,26 @@ var simcirExt = (function() {
   //   - label omitted when equal to type (redundant for OR, DC, etc.)
   //   - state omitted when false (default); stored as s:1 when true
   //   - connector endpoints encoded as "NiM"/"NoM" instead of "devN.inM"/"devN.outM"
+  //
+  // Optional extensions for 発展モード (added without changing v:1, because a
+  // circuit that does not use them encodes byte-for-byte as before, and old
+  // QR codes contain neither key):
+  //   - st: device state other than Toggle's {on:true/false}
+  //         (e.g. Joint direction {direction:N}; omitted for the default 0)
+  //   - p:  any other deviceDef properties (numInputs, freq, bgColor, ...)
   // ---------------------------------------------------------------------------
+
+  var QR_KNOWN_KEYS = {type: 1, id: 1, x: 1, y: 1, color: 1, label: 1, state: 1};
+
+  function _isOnOnlyState(st) {
+    var keys = Object.keys(st);
+    return keys.length === 1 && keys[0] === 'on';
+  }
+
+  function _isDefaultDirection(st) {
+    var keys = Object.keys(st);
+    return keys.length === 1 && keys[0] === 'direction' && st.direction === 0;
+  }
 
   function _portStr(s) {
     return s.replace(/^dev(\d+)\.(in|out)(\d+)$/, function(_, di, pt, pi) {
@@ -124,7 +143,21 @@ var simcirExt = (function() {
         var cd = {t: d.type, x: d.x, y: d.y};
         if (d.color) { cd.c = d.color; }
         if (d.label !== undefined && d.label !== d.type) { cd.l = d.label; }
-        if (d.state && d.state.on === true) { cd.s = 1; }
+        if (d.state) {
+          if (_isOnOnlyState(d.state)) {
+            if (d.state.on === true) { cd.s = 1; }
+          } else if (!_isDefaultDirection(d.state)) {
+            cd.st = d.state;
+          }
+        }
+        var extra = null;
+        for (var k in d) {
+          if (d.hasOwnProperty(k) && !QR_KNOWN_KEYS[k]) {
+            extra = extra || {};
+            extra[k] = d[k];
+          }
+        }
+        if (extra) { cd.p = extra; }
         return cd;
       }),
       c: data.connectors.map(function(conn) {
@@ -150,6 +183,12 @@ var simcirExt = (function() {
         };
         if (cd.c) { d.color = cd.c; }
         if (cd.s) { d.state = {on: true}; }
+        if (cd.st) { d.state = cd.st; }
+        if (cd.p) {
+          for (var k in cd.p) {
+            if (cd.p.hasOwnProperty(k) && !QR_KNOWN_KEYS[k]) { d[k] = cd.p[k]; }
+          }
+        }
         return d;
       }),
       connectors: compact.c.map(function(c) {
@@ -183,14 +222,22 @@ var simcirExt = (function() {
   }
 
   // Restore circuit into placeholder div from any supported hash string.
+  // Returns false (leaving the placeholder empty) if the hash cannot be
+  // decoded or contains a device type that is not registered on this page.
   function setData($placeholder, toolboxConfig, hash) {
     var json;
     try { json = JSON.parse(decode(hash)); }
     catch (e) { return false; }
+    if (!json) { return false; }
     var data = JSON.parse(JSON.stringify(toolboxConfig));
     if (json.devices)    { data.devices    = json.devices; }
     if (json.connectors) { data.connectors = json.connectors; }
-    simcir.setupSimcir($placeholder, data);
+    try {
+      simcir.setupSimcir($placeholder, data);
+    } catch (e) {
+      $placeholder.children().remove();
+      return false;
+    }
     return true;
   }
 

@@ -7,141 +7,22 @@
   <link rel="stylesheet" type="text/css" href="simcir.css" />
   <script type="text/javascript" src="simcir-basicset.js"></script>
   <link rel="stylesheet" type="text/css" href="simcir-basicset.css" />
+  <!-- 各モードで作った回路のURLをどのページで開いても表示できるよう、ライブラリは全ページで読み込む -->
+  <script type="text/javascript" src="simcir-library.js"></script>
   <script type="text/javascript" src="lz-string.min.js"></script>
   <script type="text/javascript" src="simcir-ext.js"></script>
   <script type="text/javascript" src="qrcode.js"></script>
-  <style>
-    * { box-sizing: border-box; font-family: arial, sans-serif; }
-    body { margin: 0; padding: 0; background: #fff; }
-
-    nav {
-      display: flex;
-      align-items: center;
-      gap: 4px;
-      background: #2c3e50;
-      padding: 0 12px;
-      height: 40px;
-    }
-    nav a, nav span {
-      color: #aaa;
-      text-decoration: none;
-      padding: 4px 10px;
-      border-radius: 4px;
-      font-size: 0.9em;
-    }
-    nav a:hover { color: #fff; background: rgba(255,255,255,0.1); }
-    nav .active { color: #fff; background: rgba(255,255,255,0.15); font-weight: bold; }
-    nav .sep { color: #555; padding: 0; }
-
-    .container { padding: 8px 12px; }
-    h1 { font-size: 1.2em; margin: 4px 0 6px; }
-
-    .usage {
-      margin: 0 0 8px;
-      padding-left: 20px;
-      font-size: 0.8em;
-      color: #555;
-      line-height: 1.6;
-    }
-
-    #simcirMain { margin-bottom: 8px; }
-
-    .controls {
-      display: flex;
-      gap: 8px;
-      align-items: center;
-      flex-wrap: wrap;
-      margin-bottom: 4px;
-    }
-    .controls button {
-      padding: 8px 16px;
-      background: #2980b9;
-      color: #fff;
-      border: none;
-      border-radius: 4px;
-      font-size: 0.9em;
-      cursor: pointer;
-      touch-action: manipulation;
-    }
-    .controls button:active { background: #1a6fa0; }
-    .controls a {
-      display: inline-block;
-      padding: 8px 16px;
-      color: #555;
-      font-size: 0.9em;
-      text-decoration: none;
-      border: 1px solid #ccc;
-      border-radius: 4px;
-      touch-action: manipulation;
-    }
-    .controls a:active { background: #f0f0f0; }
-
-    .hint {
-      font-size: 0.75em;
-      color: #888;
-      margin-top: 4px;
-    }
-
-    /* QR modal */
-    #qrOverlay {
-      display: none;
-      position: fixed;
-      inset: 0;
-      background: rgba(0,0,0,0.5);
-      z-index: 10000;
-      align-items: center;
-      justify-content: center;
-    }
-    #qrOverlay.show { display: flex; }
-    #qrBox {
-      background: #fff;
-      border-radius: 8px;
-      padding: 20px;
-      text-align: center;
-      max-width: 90vw;
-    }
-    #qrBox p {
-      margin: 12px 0 0;
-      font-size: 0.75em;
-      color: #555;
-      word-break: break-all;
-      max-width: 260px;
-    }
-    #qrBox button {
-      margin-top: 12px;
-      padding: 6px 18px;
-      background: #888;
-      color: #fff;
-      border: none;
-      border-radius: 4px;
-      cursor: pointer;
-      font-size: 0.85em;
-    }
-
-    /* Toast notification */
-    #toast {
-      position: fixed;
-      bottom: 24px;
-      left: 50%;
-      transform: translateX(-50%);
-      background: #333;
-      color: #fff;
-      padding: 10px 20px;
-      border-radius: 20px;
-      font-size: 0.9em;
-      pointer-events: none;
-      opacity: 0;
-      transition: opacity 0.3s;
-      z-index: 9999;
-    }
-    #toast.show { opacity: 1; }
-  </style>
+  <link rel="stylesheet" type="text/css" href="simcir-mode.css" />
   <title>論理回路シミュレータ（学習モード）</title>
 </head>
 <body>
 
 <nav>
   <span class="active">学習モード</span>
+  <span class="sep">|</span>
+  <a href="ff.html">発展モード（FF）</a>
+  <span class="sep">|</span>
+  <a href="advanced.html">発展モード（全素子）</a>
   <span class="sep">|</span>
   <a href="sample.html">詳細モード</a>
 </nav>
@@ -152,6 +33,7 @@
     <li>左のツールボックスからデバイスをドラッグして配置</li>
     <li>端子（ノード）をドラッグして接続。入力端子をクリックで接続を切断</li>
     <li>デバイスをツールボックス側へ戻すと削除</li>
+    <li>デバイス名をダブルクリックすると名前を変更</li>
     <li>ToggleスイッチやDCを接続して動作を確認しよう</li>
   </ul>
 
@@ -176,6 +58,7 @@
 <div id="toast"></div>
 
 <script>
+  // このモードのツールボックスに並べる素子
   var TOOLBOX = [
     {"type":"DC"},
     {"type":"Toggle"},
@@ -187,91 +70,8 @@
     {"type":"XOR",  "label":"XOR"},
     {"type":"4bit7seg","color":"#ff0000"}
   ];
-
-  var BASE_CONFIG = {
-    width: 640, height: 800,
-    showToolbox: true,
-    toolbox: TOOLBOX,
-    devices: [], connectors: []
-  };
-
-  // ---- Toast ----
-  var toastTimer = null;
-  function showToast(msg) {
-    var el = document.getElementById('toast');
-    el.textContent = msg;
-    el.className = 'show';
-    if (toastTimer) { clearTimeout(toastTimer); }
-    toastTimer = setTimeout(function() {
-      el.className = '';
-    }, 2000);
-  }
-
-  // ---- QR code ----
-  function showQR() {
-    var $ = simcir.$;
-    // QR専用高圧縮フォーマット(q:プレフィックス)を使用。
-    // URLバーは変更せず、QRコード用URLのみ生成する。
-    var qrHash = simcirExt.getQRData($('.simcir-workspace'));
-    var qrUrl = location.href.split('#')[0] + '#' + qrHash;
-    try {
-      var qr = qrcode(0, 'M');
-      qr.addData(qrUrl);
-      qr.make();
-      document.getElementById('qrImage').innerHTML = qr.createSvgTag(4, 0);
-      document.getElementById('qrUrl').textContent = qrUrl;
-      document.getElementById('qrOverlay').className = 'show';
-    } catch (e) {
-      showToast('URLが長すぎてQRコードを生成できません');
-    }
-  }
-
-  function hideQR(e) {
-    if (e && e.target !== document.getElementById('qrOverlay')) { return; }
-    document.getElementById('qrOverlay').className = '';
-  }
-
-  // ---- URL copy ----
-  function urlCopy() {
-    var $ = simcir.$;
-    var hash = simcirExt.getData($('.simcir-workspace'));
-    history.replaceState(null, '', location.pathname + '#' + hash);
-    if (navigator.clipboard && navigator.clipboard.writeText) {
-      navigator.clipboard.writeText(location.href)
-        .then(function() { showToast('URLをクリップボードにコピーしました'); })
-        .catch(function() { legacyCopy(); });
-    } else {
-      legacyCopy();
-    }
-  }
-
-  function legacyCopy() {
-    var input = document.createElement('input');
-    input.style.position = 'fixed';
-    input.style.opacity = '0';
-    input.value = location.href;
-    document.body.appendChild(input);
-    input.select();
-    try {
-      document.execCommand('copy');
-      showToast('URLをクリップボードにコピーしました');
-    } catch (e) {
-      prompt('このURLをコピーしてください:', location.href);
-    }
-    document.body.removeChild(input);
-  }
-
-  // ---- Init ----
-  window.addEventListener('DOMContentLoaded', function() {
-    var $ = simcir.$;
-    var hash = location.hash.replace('#', '');
-    if (hash) {
-      simcirExt.setData($('#simcirMain'), BASE_CONFIG, hash);
-    } else {
-      simcir.setupSimcir($('#simcirMain'), BASE_CONFIG);
-    }
-  });
 </script>
+<script type="text/javascript" src="simcir-mode.js"></script>
 
 <hr/>
 <div style="text-align: right;">

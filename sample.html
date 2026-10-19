@@ -48,7 +48,8 @@ nav {
   gap: 4px;
   background: #2c3e50;
   padding: 0 12px;
-  height: 40px;
+  flex-wrap: wrap;
+  min-height: 40px;
   margin: -8px -12px 12px;
 }
 nav a, nav span {
@@ -68,6 +69,10 @@ nav .sep { color: #555; padding: 0; }
 
 <nav>
   <a href="index.html">学習モード</a>
+  <span class="sep">|</span>
+  <a href="ff.html">発展モード（FF）</a>
+  <span class="sep">|</span>
+  <a href="advanced.html">発展モード（全素子）</a>
   <span class="sep">|</span>
   <span class="active">詳細モード</span>
 </nav>
